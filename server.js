@@ -41,25 +41,37 @@ app.get('/api/get-kyc-token', (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// --- СЕЙФ В ОПЕРАТИВНОЙ ПАМЯТИ ---
-const verifiedUsers = new Set();
+// --- КОММЕРЧЕСКАЯ БАЗА ДАННЫХ (ОПЕРАТИВНАЯ ПАМЯТЬ) ---
+const usersDB = {}; // Формат: { "12345": { kycPassed: true, isPaid: false } }
 
-// Маршрут для сохранения успешного KYC
+// 1. Сохранение успешного KYC (Клиент проверен, но еще НЕ оплатил)
 app.post('/api/save-kyc-status', express.json(), (req, res) => {
     const { telegramId } = req.body;
     if (telegramId) {
-        verifiedUsers.add(String(telegramId)); // Записываем ID в память
+        if (!usersDB[telegramId]) usersDB[telegramId] = { kycPassed: false, isPaid: false };
+        usersDB[telegramId].kycPassed = true;
         res.json({ success: true });
     } else {
         res.status(400).json({ success: false, error: 'Нет Telegram ID' });
     }
 });
 
-// Маршрут для проверки, проходил ли человек KYC
+// 2. Сохранение ОПЛАТЫ (Клиент заплатил)
+app.post('/api/save-payment', express.json(), (req, res) => {
+    const { telegramId } = req.body;
+    if (telegramId && usersDB[telegramId]) {
+        usersDB[telegramId].isPaid = true;
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ success: false, error: 'Клиент не найден или нет ID' });
+    }
+});
+
+// 3. Проверка полного статуса клиента
 app.get('/api/check-status', (req, res) => {
     const telegramId = req.query.telegramId;
-    const isVerified = verifiedUsers.has(String(telegramId)); // Ищем ID в памяти
-    res.json({ verified: isVerified });
+    const user = usersDB[telegramId] || { kycPassed: false, isPaid: false };
+    res.json(user); // Отдаем статус верификации и оплаты
 });
 // ---------------------------------
 const PORT = process.env.PORT || 3000;
