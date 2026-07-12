@@ -41,7 +41,27 @@ app.get('/api/get-kyc-token', (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+// --- СЕЙФ В ОПЕРАТИВНОЙ ПАМЯТИ ---
+const verifiedUsers = new Set();
 
+// Маршрут для сохранения успешного KYC
+app.post('/api/save-kyc-status', express.json(), (req, res) => {
+    const { telegramId } = req.body;
+    if (telegramId) {
+        verifiedUsers.add(String(telegramId)); // Записываем ID в память
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ success: false, error: 'Нет Telegram ID' });
+    }
+});
+
+// Маршрут для проверки, проходил ли человек KYC
+app.get('/api/check-status', (req, res) => {
+    const telegramId = req.query.telegramId;
+    const isVerified = verifiedUsers.has(String(telegramId)); // Ищем ID в памяти
+    res.json({ verified: isVerified });
+});
+// ---------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Veris Backend запущен на порту ${PORT}`);
